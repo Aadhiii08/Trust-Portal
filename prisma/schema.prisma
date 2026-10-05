@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String          @id @default(uuid())
+  studentId    String?         @unique // Auto-generated unique ID for students
+  email        String?         
+  phone        String?         
+  passwordHash String
+  name         String? // Added for common profile
+  photoUrl     String? // Added for profile photo
+  role         String          @default("USER") // ADMIN or USER
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  profile      StudentProfile?
+  documents    Document[]
+}
+
+model StudentProfile {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Basic Details (Some are in User, but adding extras here)
+  gender       String?
+  dob          DateTime?
+  aadharNumber String?
+
+  // Residential Details
+  address          String?
+  permanentAddress String?
+  city             String?
+  state            String?
+  pincode          String?
+  durationOfStay   String?
+
+  // Educational Details
+  schoolCollegeName    String?
+  schoolCollegeAddress String?
+  currentCourse        String?
+  department           String?
+  universityBoard      String?
+  academicYear         String?
+  semesterYear         String?
+  mediumOfStudy        String?
+  previousMarks        String?
+
+  // Fee Details
+  tuitionFee          Float? @default(0)
+  hostelFee           Float? @default(0)
+  otherFee            Float? @default(0)
+  totalFee            Float? @default(0)
+  totalAnnualFees     Float? @default(0)
+  scholarshipReceived Float? @default(0)
+  balanceRequired     Float? @default(0)
+  paidAmount          Float? @default(0)
+  balanceAmount       Float? @default(0)
+
+  // Term 2 Fee Details
+  hasTerm2Fees             Boolean? @default(false)
+  term2TuitionFee          Float?   @default(0)
+  term2HostelFee           Float?   @default(0)
+  term2OtherFee            Float?   @default(0)
+  term2TotalFee            Float?   @default(0)
+  term2TotalAnnualFees     Float?   @default(0)
+  term2ScholarshipReceived Float?   @default(0)
+  term2BalanceRequired     Float?   @default(0)
+  term2PaidAmount          Float?   @default(0)
+  term2BalanceAmount       Float?   @default(0)
+
+  // Parent/Guardian Details
+  fatherName       String?
+  fatherOccupation String?
+  fatherIncome     Float?  @default(0)
+  motherName       String?
+  motherOccupation String?
+  motherIncome     Float?  @default(0)
+  parentName       String?
+  parentOccupation String?
+  parentPhone      String?
+  totalIncome      String?
+
+  // Financial/Social Background
+  category      String?
+  familyType    String? // Joint, Nuclear
+  houseType     String? // Owned, Rented
+  religion      String?
+  caste         String?
+  medicalIssue  String? // Yes, No
+  singleParent  String? // Yes, No
+  orphanStatus  String? // Orphan, Semi-Orphan, NA
+  existingLoan  String? // Yes, No
+  loanAmount    Float?  @default(0)
+  firstGraduate String? // Yes, No
+
+  // Reference Details
+  appliedThrough       String? // Direct, Reference
+  sourceType           String? // Employee, Trust, School/College, NGO, Existing Beneficiary
+  referenceName        String?
+  referenceDesignation String?
+  referenceContact     String?
+  referenceOrg         String?
+  referenceRelation    String?
+
+  isDeclared Boolean @default(false)
+
+  // System/Admin Fields
+  amountSponsored Float @default(0)
+  amountPaid      Float @default(0)
+  sponsorStatus   String @default("PENDING") // PENDING, PROCESSING, APPROVED
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Document {
+  id           String   @id @default(uuid())
+  studentId    String
+  user         User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  documentType String // AADHAR, PAN, BIRTH_CERTIFICATE, EDUCATION_DOCS
+  fileUrl      String
+  originalName String? // Added to show filename in UI
+  status       String   @default("PENDING") // PENDING, VERIFIED, REJECTED
+  uploadedAt   DateTime @default(now())
+}
