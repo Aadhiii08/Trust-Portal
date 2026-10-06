@@ -80,6 +80,12 @@ export default function SuperAdminDashboard() {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [loading, setLoading] = useState(true);
 
+  // Document Verification Search & Selection States
+  const [docSearchQuery, setDocSearchQuery] = useState('');
+  const [docFilter, setDocFilter] = useState<'ALL' | 'PENDING' | 'VERIFIED'>('ALL');
+  const [selectedDocs, setSelectedDocs] = useState<{ [docId: string]: boolean }>({});
+  const [processingDocId, setProcessingDocId] = useState<string | null>(null);
+
   // Profile Form State
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -191,6 +197,104 @@ export default function SuperAdminDashboard() {
     } finally {
       setPhotoUploading(false);
     }
+  };
+
+  const handleDocumentStatus = async (docId: string, status: string) => {
+    setProcessingDocId(docId);
+    setDashboardData((prev: any) => {
+      if (!prev || !prev.students) return prev;
+      return {
+        ...prev,
+        students: prev.students.map((student: any) => ({
+          ...student,
+          documents: student.documents?.map((doc: any) =>
+            doc.id === docId ? { ...doc, status } : doc
+          )
+        }))
+      };
+    });
+
+    try {
+      await fetch('/api/admin/document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: docId, status }),
+      });
+      setSelectedDocs(prev => {
+        const next = { ...prev };
+        delete next[docId];
+        return next;
+      });
+    } catch (e) {
+      console.error(e);
+      fetchData(false);
+    } finally {
+      setProcessingDocId(null);
+    }
+  };
+
+  const handleBulkDocumentStatus = async (studentId: string, status: string, targetDocIds?: string[]) => {
+    const student = dashboardData?.students?.find((s: any) => s.id === studentId);
+    if (!student) return;
+
+    const idsToUpdate = targetDocIds && targetDocIds.length > 0
+      ? targetDocIds
+      : student.documents?.filter((d: any) => d.status === 'PENDING').map((d: any) => d.id) || [];
+
+    if (idsToUpdate.length === 0) {
+      alert(`No pending documents to ${status.toLowerCase()}.`);
+      return;
+    }
+
+    setDashboardData((prev: any) => {
+      if (!prev || !prev.students) return prev;
+      return {
+        ...prev,
+        students: prev.students.map((st: any) => {
+          if (st.id !== studentId) return st;
+          return {
+            ...st,
+            documents: st.documents?.map((doc: any) =>
+              idsToUpdate.includes(doc.id) ? { ...doc, status } : doc
+            )
+          };
+        })
+      };
+    });
+
+    try {
+      await fetch('/api/admin/document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: idsToUpdate, status }),
+      });
+
+      setSelectedDocs(prev => {
+        const next = { ...prev };
+        idsToUpdate.forEach((id: string) => delete next[id]);
+        return next;
+      });
+    } catch (e) {
+      console.error('Bulk update error:', e);
+      fetchData(false);
+    }
+  };
+
+  const toggleSelectAllForStudent = (student: any) => {
+    const pendingDocIds = student.documents?.filter((d: any) => d.status === 'PENDING').map((d: any) => d.id) || [];
+    if (pendingDocIds.length === 0) return;
+
+    const allSelected = pendingDocIds.every((id: string) => !!selectedDocs[id]);
+
+    setSelectedDocs(prev => {
+      const next = { ...prev };
+      if (allSelected) {
+        pendingDocIds.forEach((id: string) => delete next[id]);
+      } else {
+        pendingDocIds.forEach((id: string) => next[id] = true);
+      }
+      return next;
+    });
   };
 
   const downloadStudentPDF = (student: any) => {
@@ -364,6 +468,34 @@ export default function SuperAdminDashboard() {
   ) || [];
 
   const pendingDocuments = allDocuments.filter((d: any) => d.status === 'PENDING');
+
+  const filteredDocStudents = (dashboardData?.students || [])
+    .filter((s: any) => s.documents && s.documents.length > 0)
+    .filter((s: any) => {
+      if (docSearchQuery.trim()) {
+        const query = docSearchQuery.toLowerCase().trim();
+        const matchName = s.name?.toLowerCase().includes(query);
+        const matchEmail = s.email?.toLowerCase().includes(query);
+        const matchStudentId = s.studentId?.toLowerCase().includes(query);
+        const matchCourse = s.profile?.currentCourse?.toLowerCase().includes(query);
+        const matchRef = s.profile?.referenceName?.toLowerCase().includes(query);
+        if (!matchName && !matchEmail && !matchStudentId && !matchCourse && !matchRef) {
+          return false;
+        }
+      }
+      if (docFilter === 'PENDING') {
+        return s.documents.some((d: any) => d.status === 'PENDING');
+      }
+      if (docFilter === 'VERIFIED') {
+        return s.documents.every((d: any) => d.status === 'VERIFIED');
+      }
+      return true;
+    })
+    .sort((a: any, b: any) => {
+      const aPending = a.documents.filter((d: any) => d.status === 'PENDING').length;
+      const bPending = b.documents.filter((d: any) => d.status === 'PENDING').length;
+      return bPending - aPending;
+    });
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc' }}>
@@ -745,48 +877,266 @@ export default function SuperAdminDashboard() {
           {activeTab === 'documents' && (
             <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
               <div style={{ padding: '1.5rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-                <h2 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 600, color: '#0f172a' }}>Document Verifications Overview (View Only)</h2>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.25rem', margin: 0, fontWeight: 700, color: '#0f172a' }}>Document Verifications</h2>
+                    <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: '#64748b' }}>
+                      Review, preview, and approve or reject uploaded student verification documents.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ padding: '0.35rem 0.75rem', background: '#fee2e2', color: '#dc2626', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 700 }}>
+                      {pendingDocuments.length} Pending Documents
+                    </span>
+                  </div>
+                </div>
+
+                {/* Search & Filter Bar */}
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div style={{ position: 'relative', flex: '1 1 300px' }}>
+                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '1rem' }}>🔍</span>
+                    <input
+                      type="text"
+                      placeholder="Search student name, email, student ID, course..."
+                      value={docSearchQuery}
+                      onChange={(e) => setDocSearchQuery(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.65rem 2.25rem 0.65rem 2.5rem',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.875rem',
+                        outline: 'none',
+                        backgroundColor: '#ffffff',
+                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)'
+                      }}
+                    />
+                    {docSearchQuery && (
+                      <button
+                        onClick={() => setDocSearchQuery('')}
+                        style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '0.9rem', padding: '2px 6px', borderRadius: '50%' }}
+                        title="Clear Search"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    {[
+                      { id: 'ALL', label: 'All Students' },
+                      { id: 'PENDING', label: `Pending Action (${dashboardData?.students?.filter((s: any) => s.documents?.some((d: any) => d.status === 'PENDING')).length || 0})` },
+                      { id: 'VERIFIED', label: 'All Approved' }
+                    ].map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => setDocFilter(f.id as any)}
+                        style={{
+                          padding: '0.55rem 0.9rem',
+                          borderRadius: '8px',
+                          border: docFilter === f.id ? '1px solid #10b981' : '1px solid #e2e8f0',
+                          background: docFilter === f.id ? '#ecfdf5' : '#ffffff',
+                          color: docFilter === f.id ? '#059669' : '#475569',
+                          fontWeight: docFilter === f.id ? 700 : 500,
+                          fontSize: '0.8rem',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s'
+                        }}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
+
+              {/* Student Cards List */}
               <div style={{ padding: '1.5rem' }}>
-                {dashboardData?.students?.filter((s: any) => s.documents?.length > 0).length === 0 ? (
-                   <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>No documents uploaded yet.</div>
+                {filteredDocStudents.length === 0 ? (
+                  <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔍</div>
+                    <div style={{ fontWeight: 600, fontSize: '1rem', color: '#0f172a' }}>No students match your search criteria</div>
+                    <div style={{ fontSize: '0.85rem', marginTop: '0.25rem' }}>Try searching with a different student name or clearing the search filter.</div>
+                    {docSearchQuery && (
+                      <button onClick={() => setDocSearchQuery('')} style={{ marginTop: '1rem', padding: '0.5rem 1rem', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>
+                        Clear Search
+                      </button>
+                    )}
+                  </div>
                 ) : (
-                  dashboardData?.students?.filter((s: any) => s.documents?.length > 0).map((student: any) => (
-                    <div key={student.id} style={{ marginBottom: '2rem', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
-                      <div style={{ padding: '1rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <span style={{ fontWeight: 700, color: '#0f172a' }}>{student.name || 'Unnamed'}</span>
-                          <span style={{ margin: '0 0.5rem', color: '#cbd5e1' }}>|</span>
-                          <span style={{ fontSize: '0.85rem', color: '#64748b' }}>{student.email}</span>
+                  filteredDocStudents.map((student: any) => {
+                    const studentPendingDocs = student.documents?.filter((d: any) => d.status === 'PENDING') || [];
+                    const studentSelectedDocIds = student.documents?.filter((d: any) => selectedDocs[d.id])?.map((d: any) => d.id) || [];
+                    const isAllPendingSelected = studentPendingDocs.length > 0 && studentPendingDocs.every((d: any) => selectedDocs[d.id]);
+
+                    return (
+                      <div key={student.id} style={{ marginBottom: '2rem', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                        {/* Student Header */}
+                        <div style={{ padding: '1rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 700, fontSize: '1.05rem', color: '#0f172a' }}>{student.name || 'Unnamed'}</span>
+                            <span style={{ color: '#cbd5e1' }}>|</span>
+                            <span style={{ fontSize: '0.85rem', color: '#64748b' }}>{student.email}</span>
+                            {student.studentId && (
+                              <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem', background: '#ecfdf5', color: '#059669', borderRadius: '4px', fontWeight: 700 }}>
+                                ID: {student.studentId}
+                              </span>
+                            )}
+                            {student.profile?.currentCourse && (
+                              <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem', background: '#eef2ff', color: '#4338ca', borderRadius: '4px', fontWeight: 600 }}>
+                                {student.profile?.currentCourse}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Quick Bulk Action Buttons for Student */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            {studentPendingDocs.length > 0 ? (
+                              <>
+                                <span style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem', background: '#fef3c7', color: '#92400e', borderRadius: '4px', fontWeight: 700 }}>
+                                  ⏳ {studentPendingDocs.length} Pending
+                                </span>
+
+                                {studentSelectedDocIds.length > 0 ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleBulkDocumentStatus(student.id, 'VERIFIED', studentSelectedDocIds)}
+                                      style={{ padding: '0.4rem 0.85rem', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem', boxShadow: '0 1px 2px rgba(16, 185, 129, 0.3)' }}
+                                    >
+                                      ✓ Approve Selected ({studentSelectedDocIds.length})
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleBulkDocumentStatus(student.id, 'REJECTED', studentSelectedDocIds)}
+                                      style={{ padding: '0.4rem 0.85rem', background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                                    >
+                                      ✕ Reject Selected ({studentSelectedDocIds.length})
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleBulkDocumentStatus(student.id, 'VERIFIED')}
+                                    style={{ padding: '0.4rem 0.85rem', background: '#059669', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem', boxShadow: '0 1px 2px rgba(5, 150, 105, 0.3)' }}
+                                    title="Immediately approve all pending documents for this candidate"
+                                  >
+                                    ✓ Approve All Documents ({studentPendingDocs.length})
+                                  </button>
+                                )}
+                              </>
+                            ) : (
+                              <span style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem', background: '#dcfce7', color: '#166534', borderRadius: '4px', fontWeight: 700 }}>
+                                ✓ All Verified ({student.documents.length} Files)
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <span style={{ fontSize: '0.8rem', padding: '0.2rem 0.6rem', background: '#eef2ff', color: '#4f46e5', borderRadius: '4px', fontWeight: 600 }}>
-                          {student.documents.length} Files
-                        </span>
-                      </div>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                        <thead>
-                          <tr style={{ backgroundColor: '#ffffff' }}>
-                            <th style={{ padding: '0.75rem 1.5rem', fontSize: '0.75rem', color: '#64748b', borderBottom: '1px solid #f1f5f9' }}>Type</th>
-                            <th style={{ padding: '0.75rem 1.5rem', fontSize: '0.75rem', color: '#64748b', borderBottom: '1px solid #f1f5f9' }}>File</th>
-                            <th style={{ padding: '0.75rem 1.5rem', fontSize: '0.75rem', color: '#64748b', borderBottom: '1px solid #f1f5f9' }}>Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {student.documents.map((doc: any) => (
-                            <tr key={doc.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                              <td style={{ padding: '0.75rem 1.5rem', fontSize: '0.9rem', fontWeight: 500, color: '#475569' }}>{doc.documentType.replace('_', ' ')}</td>
-                              <td style={{ padding: '0.75rem 1.5rem' }}>
-                                <button onClick={(e) => { e.preventDefault(); setPreviewDoc(doc); }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: '0.85rem', color: '#4f46e5', textDecoration: 'underline', fontWeight: 600, textAlign: 'left' }}>{doc.originalName || 'Preview File'}</button>
-                              </td>
-                              <td style={{ padding: '0.75rem 1.5rem' }}>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: doc.status === 'VERIFIED' ? '#059669' : doc.status === 'REJECTED' ? '#dc2626' : '#d97706' }}>{doc.status}</span>
-                              </td>
+
+                        {/* Document Table */}
+                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                          <thead>
+                            <tr style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
+                              <th style={{ padding: '0.75rem 1.5rem', width: '40px', textAlign: 'center' }}>
+                                {studentPendingDocs.length > 0 && (
+                                  <input
+                                    type="checkbox"
+                                    checked={isAllPendingSelected}
+                                    onChange={() => toggleSelectAllForStudent(student)}
+                                    title="Select all pending documents"
+                                    style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#10b981' }}
+                                  />
+                                )}
+                              </th>
+                              <th style={{ padding: '0.75rem 1.5rem', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Document Type</th>
+                              <th style={{ padding: '0.75rem 1.5rem', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>File Name</th>
+                              <th style={{ padding: '0.75rem 1.5rem', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Status / Action</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ))
+                          </thead>
+                          <tbody>
+                            {student.documents.map((doc: any) => {
+                              const isSelected = !!selectedDocs[doc.id];
+                              const isPending = doc.status === 'PENDING';
+
+                              return (
+                                <tr key={doc.id} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: isSelected ? '#f0fdf4' : 'transparent' }}>
+                                  <td style={{ padding: '0.75rem 1.5rem', textAlign: 'center' }}>
+                                    {isPending ? (
+                                      <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        onChange={() => {
+                                          setSelectedDocs(prev => ({ ...prev, [doc.id]: !prev[doc.id] }));
+                                        }}
+                                        style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#10b981' }}
+                                      />
+                                    ) : (
+                                      <span style={{ color: doc.status === 'VERIFIED' ? '#10b981' : '#ef4444', fontSize: '0.9rem' }}>
+                                        {doc.status === 'VERIFIED' ? '✓' : '✕'}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td style={{ padding: '0.75rem 1.5rem', fontSize: '0.9rem', fontWeight: 600, color: '#1e293b' }}>
+                                    {doc.documentType.replace('_', ' ')}
+                                  </td>
+                                  <td style={{ padding: '0.75rem 1.5rem' }}>
+                                    <button
+                                      onClick={(e) => { e.preventDefault(); setPreviewDoc(doc); }}
+                                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: '0.85rem', color: '#4f46e5', textDecoration: 'underline', fontWeight: 600, textAlign: 'left' }}
+                                    >
+                                      {doc.originalName || 'Preview File'}
+                                    </button>
+                                  </td>
+                                  <td style={{ padding: '0.75rem 1.5rem' }}>
+                                    {isPending ? (
+                                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                        <button
+                                          type="button"
+                                          disabled={processingDocId === doc.id}
+                                          onClick={() => handleDocumentStatus(doc.id, 'VERIFIED')}
+                                          style={{ padding: '0.35rem 0.75rem', background: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }}
+                                        >
+                                          {processingDocId === doc.id ? '...' : 'Approve'}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={processingDocId === doc.id}
+                                          onClick={() => handleDocumentStatus(doc.id, 'REJECTED')}
+                                          style={{ padding: '0.35rem 0.75rem', background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }}
+                                        >
+                                          Reject
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <span style={{
+                                          fontSize: '0.75rem',
+                                          fontWeight: 700,
+                                          padding: '0.2rem 0.5rem',
+                                          borderRadius: '4px',
+                                          backgroundColor: doc.status === 'VERIFIED' ? '#dcfce7' : '#fee2e2',
+                                          color: doc.status === 'VERIFIED' ? '#15803d' : '#b91c1c'
+                                        }}>
+                                          {doc.status === 'VERIFIED' ? '✓ VERIFIED' : '✕ REJECTED'}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDocumentStatus(doc.id, doc.status === 'VERIFIED' ? 'REJECTED' : 'VERIFIED')}
+                                          style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
+                                        >
+                                          Change
+                                        </button>
+                                      </div>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
