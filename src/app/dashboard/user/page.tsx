@@ -48,8 +48,8 @@ export default function UserDashboard() {
     try {
       const timestamp = Date.now();
       const [profileRes, docsRes] = await Promise.all([
-        fetch(`/api/student/profile?t=${timestamp}`),
-        fetch(`/api/student/upload?t=${timestamp}`)
+        fetch(`/api/student/profile?t=${timestamp}`, { cache: 'no-store' }),
+        fetch(`/api/student/upload?t=${timestamp}`, { cache: 'no-store' })
       ]);
 
       if (profileRes.ok) {

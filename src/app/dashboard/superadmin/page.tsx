@@ -80,7 +80,9 @@ export default function SuperAdminDashboard() {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [loading, setLoading] = useState(true);
 
-  // Document Verification Search & Selection States
+  // Search & Filter States
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [docSearchQuery, setDocSearchQuery] = useState('');
   const [docFilter, setDocFilter] = useState<'ALL' | 'PENDING' | 'VERIFIED'>('ALL');
   const [selectedDocs, setSelectedDocs] = useState<{ [docId: string]: boolean }>({});
@@ -104,10 +106,12 @@ export default function SuperAdminDashboard() {
 
   const fetchData = async (showLoading = true) => {
     if (showLoading) setLoading(true);
+    setIsRefreshing(true);
     try {
+      const timestamp = Date.now();
       const [userRes, dashRes] = await Promise.all([
-        fetch('/api/user/profile'),
-        fetch('/api/admin/dashboard')
+        fetch(`/api/user/profile?t=${timestamp}`, { cache: 'no-store' }),
+        fetch(`/api/admin/dashboard?t=${timestamp}`, { cache: 'no-store' })
       ]);
 
       if (userRes.ok) {
@@ -129,6 +133,7 @@ export default function SuperAdminDashboard() {
       console.error(e);
     } finally {
       if (showLoading) setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -415,6 +420,18 @@ export default function SuperAdminDashboard() {
             </div>
           </div>
 
+          <div class="section">
+            <div class="section-title">Reference & Recommendation Details</div>
+            <div class="grid">
+              <div class="item full-width"><span class="label">Reference Name:</span> <span class="value" style="font-weight: bold; color: #0f172a;">${p.referenceName || 'N/A'}</span></div>
+              <div class="item"><span class="label">Designation:</span> <span class="value">${p.referenceDesignation || 'N/A'}</span></div>
+              <div class="item"><span class="label">Contact No:</span> <span class="value">${p.referenceContact || 'N/A'}</span></div>
+              <div class="item"><span class="label">Organization:</span> <span class="value">${p.referenceOrg || 'N/A'}</span></div>
+              <div class="item"><span class="label">Relationship:</span> <span class="value">${p.referenceRelation || 'N/A'}</span></div>
+              <div class="item full-width"><span class="label">Applied Through:</span> <span class="value">${p.appliedThrough || p.sourceType || 'N/A'}</span></div>
+            </div>
+          </div>
+
           <div class="section" style="page-break-inside: avoid;">
             <div class="section-title">Trust Sponsorship Details</div>
             <div class="grid">
@@ -461,6 +478,22 @@ export default function SuperAdminDashboard() {
   };
 
   if (loading) return <div className="flex-center" style={{ minHeight: '100vh', color: 'var(--primary)', fontSize: '1.2rem', fontWeight: 'bold' }}>Loading Superadmin Portal...</div>;
+
+  // Filtered Students for Overview & Directory
+  const filteredStudents = (dashboardData?.students || []).filter((s: any) => {
+    if (!studentSearchQuery.trim()) return true;
+    const query = studentSearchQuery.toLowerCase().trim();
+    const matchName = s.name?.toLowerCase().includes(query);
+    const matchEmail = s.email?.toLowerCase().includes(query);
+    const matchPhone = s.phone?.toLowerCase().includes(query);
+    const matchStudentId = s.studentId?.toLowerCase().includes(query);
+    const matchCourse = s.profile?.currentCourse?.toLowerCase().includes(query);
+    const matchSchool = s.profile?.schoolCollegeName?.toLowerCase().includes(query);
+    const matchRef = s.profile?.referenceName?.toLowerCase().includes(query);
+    const matchRefDesig = s.profile?.referenceDesignation?.toLowerCase().includes(query);
+    const matchRefOrg = s.profile?.referenceOrg?.toLowerCase().includes(query);
+    return matchName || matchEmail || matchPhone || matchStudentId || matchCourse || matchSchool || matchRef || matchRefDesig || matchRefOrg;
+  });
 
   // Flatten documents for verification tab
   const allDocuments = dashboardData?.students?.flatMap((s: any) => 
@@ -578,6 +611,28 @@ export default function SuperAdminDashboard() {
             {activeTab.replace('-', ' ')}
           </h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <button
+              onClick={() => fetchData(false)}
+              disabled={isRefreshing}
+              title="Refresh student data from database"
+              style={{
+                padding: '0.45rem 0.9rem',
+                backgroundColor: isRefreshing ? '#f1f5f9' : '#ffffff',
+                color: '#334155',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                cursor: isRefreshing ? 'not-allowed' : 'pointer',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+              }}
+            >
+              <span style={{ display: 'inline-block', transform: isRefreshing ? 'rotate(180deg)' : 'none', transition: 'transform 0.5s' }}>🔄</span>
+              {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
+            </button>
             <div 
               onClick={() => setActiveTab('profile')} 
               style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'transform 0.2s' }}
@@ -621,6 +676,32 @@ export default function SuperAdminDashboard() {
                   <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>Recent Enrollments</h2>
                   <button onClick={() => setActiveTab('directory')} style={{ fontSize: '0.875rem', color: '#4f46e5', background: 'none', border: 'none', fontWeight: 600, cursor: 'pointer' }}>View All Directory</button>
                 </div>
+
+                {/* Search Bar */}
+                <div style={{ padding: '0.75rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                  <div style={{ position: 'relative', flex: '1 1 300px' }}>
+                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '0.9rem' }}>🔍</span>
+                    <input
+                      type="text"
+                      placeholder="Search student by Name, Reference Name, ID, Course, Phone, Email..."
+                      value={studentSearchQuery}
+                      onChange={(e) => setStudentSearchQuery(e.target.value)}
+                      style={{ width: '100%', padding: '0.55rem 1rem 0.55rem 2.25rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                    />
+                  </div>
+                  {studentSearchQuery && (
+                    <button
+                      onClick={() => setStudentSearchQuery('')}
+                      style={{ padding: '0.4rem 0.75rem', background: '#e2e8f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+                    >
+                      Clear
+                    </button>
+                  )}
+                  <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                    {filteredStudents.length} {filteredStudents.length === 1 ? 'Student' : 'Students'}
+                  </span>
+                </div>
+
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                   <thead style={{ backgroundColor: '#f8fafc' }}>
                     <tr>
@@ -633,32 +714,40 @@ export default function SuperAdminDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {dashboardData?.students?.map((student: any) => (
-                      <tr key={student.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '1rem 1.5rem' }}>
-                          <div style={{ fontWeight: 600, color: '#0f172a' }}>{student.name || 'N/A'}</div>
-                          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{student.email}</div>
-                        </td>
-                        <td style={{ padding: '1rem 1.5rem', fontSize: '0.9rem', color: '#475569' }}>
-                          <div style={{ fontWeight: 600 }}>{student.profile?.referenceName || '-'}</div>
-                        </td>
-                        <td style={{ padding: '1rem 1.5rem', fontSize: '0.9rem', color: '#475569' }}>{student.profile?.currentCourse || 'N/A'}</td>
-                        <td style={{ padding: '1rem 1.5rem', fontSize: '0.9rem', color: '#475569' }}>{student.profile?.aadharNumber || 'N/A'}</td>
-                        <td style={{ padding: '1rem 1.5rem' }}>
-                          <span style={{ padding: '0.25rem 0.6rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, backgroundColor: student.profile?.isDeclared ? '#dcfce7' : '#fff7ed', color: student.profile?.isDeclared ? '#166534' : '#9a3412' }}>
-                            {student.profile?.isDeclared ? '✓ Submitted' : '○ Draft'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '1rem 1.5rem' }}>
-                          <button 
-                            onClick={() => setSelectedStudent(student)}
-                            style={{ padding: '0.4rem 0.8rem', background: '#4f46e5', color: 'white', border: 'none', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
-                          >
-                            View Full Details
-                          </button>
+                    {filteredStudents.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
+                          No students found matching &quot;{studentSearchQuery}&quot;
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      filteredStudents.map((student: any) => (
+                        <tr key={student.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '1rem 1.5rem' }}>
+                            <div style={{ fontWeight: 600, color: '#0f172a' }}>{student.name || 'N/A'}</div>
+                            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{student.email}</div>
+                          </td>
+                          <td style={{ padding: '1rem 1.5rem', fontSize: '0.9rem', color: '#475569' }}>
+                            <div style={{ fontWeight: 600, color: '#0f172a' }}>{student.profile?.referenceName || '-'}</div>
+                          </td>
+                          <td style={{ padding: '1rem 1.5rem', fontSize: '0.9rem', color: '#475569' }}>{student.profile?.currentCourse || 'N/A'}</td>
+                          <td style={{ padding: '1rem 1.5rem', fontSize: '0.9rem', color: '#475569' }}>{student.profile?.aadharNumber || 'N/A'}</td>
+                          <td style={{ padding: '1rem 1.5rem' }}>
+                            <span style={{ padding: '0.25rem 0.6rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, backgroundColor: student.profile?.isDeclared ? '#dcfce7' : '#fff7ed', color: student.profile?.isDeclared ? '#166534' : '#9a3412' }}>
+                              {student.profile?.isDeclared ? '✓ Submitted' : '○ Draft'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '1rem 1.5rem' }}>
+                            <button 
+                              onClick={() => setSelectedStudent(student)}
+                              style={{ padding: '0.4rem 0.8rem', background: '#4f46e5', color: 'white', border: 'none', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+                            >
+                              View Full Details
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -668,7 +757,7 @@ export default function SuperAdminDashboard() {
           {/* Student Details Modal */}
           {selectedStudent && (
             <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-              <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', width: '100%', maxWidth: '900px', maxHeight: '90vh', overflowY: 'auto', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', width: '100%', maxWidth: '960px', maxHeight: '90vh', overflowY: 'auto', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
                 <button onClick={() => setSelectedStudent(null)} style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: '#f1f5f9', border: 'none', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold', color: '#64748b' }}>&times;</button>
                 
                 <div style={{ padding: '2.5rem' }}>
@@ -681,28 +770,53 @@ export default function SuperAdminDashboard() {
                     <div>
                       <h2 style={{ fontSize: '2rem', margin: 0, color: '#0f172a' }}>{selectedStudent.name || 'N/A'}</h2>
                       <p style={{ color: '#64748b', fontSize: '1.1rem', margin: '0.5rem 0' }}>{selectedStudent.email} | {selectedStudent.phone}</p>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                          <span style={{ padding: '0.25rem 0.75rem', background: '#eef2ff', color: '#4f46e5', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 600 }}>{selectedStudent.profile?.currentCourse}</span>
                          <span style={{ padding: '0.25rem 0.75rem', background: '#f0fdf4', color: '#16a34a', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 600 }}>ID: {selectedStudent.studentId || selectedStudent.id.slice(-6)}</span>
+                         {selectedStudent.profile?.referenceName && (
+                           <span style={{ padding: '0.25rem 0.75rem', background: '#fef3c7', color: '#92400e', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 600 }}>Ref: {selectedStudent.profile.referenceName}</span>
+                         )}
                       </div>
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-                    <div style={{ padding: '1.5rem', background: '#f8fafc', borderRadius: '12px' }}>
-                      <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem', color: '#0f172a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>Personal & Residential</h3>
-                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Gender:</strong> {selectedStudent.profile?.gender}</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.5rem' }}>
+                    <div style={{ padding: '1.5rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                      <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem', color: '#0f172a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', fontWeight: 700 }}>Personal & Residential</h3>
+                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Gender:</strong> {selectedStudent.profile?.gender || 'N/A'}</p>
                       <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>DOB:</strong> {selectedStudent.profile?.dob ? new Date(selectedStudent.profile.dob).toLocaleDateString() : 'N/A'}</p>
-                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Aadhar:</strong> {selectedStudent.profile?.aadharNumber}</p>
-                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Address:</strong> {selectedStudent.profile?.address}, {selectedStudent.profile?.city}, {selectedStudent.profile?.state} - {selectedStudent.profile?.pincode}</p>
+                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Aadhar:</strong> {selectedStudent.profile?.aadharNumber || 'N/A'}</p>
+                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Address:</strong> {selectedStudent.profile?.address || 'N/A'}, {selectedStudent.profile?.city || ''}, {selectedStudent.profile?.state || ''} - {selectedStudent.profile?.pincode || ''}</p>
+                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Stay Duration:</strong> {selectedStudent.profile?.durationOfStay || 'N/A'}</p>
                     </div>
-                    <div style={{ padding: '1.5rem', background: '#f8fafc', borderRadius: '12px' }}>
-                      <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem', color: '#0f172a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>Educational Details</h3>
-                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>School Name:</strong> {selectedStudent.profile?.schoolCollegeName}</p>
-                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>University/College Name:</strong> {selectedStudent.profile?.universityBoard}</p>
-                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Stream:</strong> {selectedStudent.profile?.department}</p>
-                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Year/Sem:</strong> {selectedStudent.profile?.semesterYear}</p>
-                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Prev Marks:</strong> {selectedStudent.profile?.previousMarks}</p>
+
+                    <div style={{ padding: '1.5rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                      <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem', color: '#0f172a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', fontWeight: 700 }}>Educational Details</h3>
+                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>School Name:</strong> {selectedStudent.profile?.schoolCollegeName || 'N/A'}</p>
+                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>University/College:</strong> {selectedStudent.profile?.universityBoard || 'N/A'}</p>
+                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Course / Stream:</strong> {selectedStudent.profile?.currentCourse || 'N/A'} ({selectedStudent.profile?.department || 'N/A'})</p>
+                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Year/Sem:</strong> {selectedStudent.profile?.semesterYear || 'N/A'} | {selectedStudent.profile?.academicYear || 'N/A'}</p>
+                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Medium / Prev Marks:</strong> {selectedStudent.profile?.mediumOfStudy || 'N/A'} ({selectedStudent.profile?.previousMarks || 'N/A'})</p>
+                    </div>
+
+                    <div style={{ padding: '1.5rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                      <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem', color: '#0f172a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', fontWeight: 700 }}>Family & Background</h3>
+                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Father:</strong> {selectedStudent.profile?.fatherName || 'N/A'} ({selectedStudent.profile?.fatherOccupation || 'N/A'} - ₹{selectedStudent.profile?.fatherIncome || 0})</p>
+                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Mother:</strong> {selectedStudent.profile?.motherName || 'N/A'} ({selectedStudent.profile?.motherOccupation || 'N/A'} - ₹{selectedStudent.profile?.motherIncome || 0})</p>
+                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Family / House:</strong> {selectedStudent.profile?.familyType || 'N/A'} / {selectedStudent.profile?.houseType || 'N/A'}</p>
+                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>First Graduate:</strong> {selectedStudent.profile?.firstGraduate || 'N/A'}</p>
+                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Medical Issue:</strong> {selectedStudent.profile?.medicalIssue || 'None'}</p>
+                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Existing Loan:</strong> {selectedStudent.profile?.existingLoan || 'No'} {selectedStudent.profile?.loanAmount ? `(₹${selectedStudent.profile?.loanAmount})` : ''}</p>
+                    </div>
+
+                    <div style={{ padding: '1.5rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                      <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem', color: '#0f172a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', fontWeight: 700 }}>Reference & Recommendation</h3>
+                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Reference Name:</strong> <span style={{ fontWeight: 600, color: '#0f172a' }}>{selectedStudent.profile?.referenceName || 'N/A'}</span></p>
+                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Designation:</strong> {selectedStudent.profile?.referenceDesignation || 'N/A'}</p>
+                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Contact Number:</strong> {selectedStudent.profile?.referenceContact || 'N/A'}</p>
+                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Organization:</strong> {selectedStudent.profile?.referenceOrg || 'N/A'}</p>
+                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Relationship:</strong> {selectedStudent.profile?.referenceRelation || 'N/A'}</p>
+                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Applied Through:</strong> {selectedStudent.profile?.appliedThrough || selectedStudent.profile?.sourceType || 'N/A'}</p>
                     </div>
                   </div>
 
@@ -834,40 +948,94 @@ export default function SuperAdminDashboard() {
 
           {activeTab === 'directory' && (
              <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-              <div style={{ padding: '1.5rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+              <div style={{ padding: '1.5rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h2 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 600, color: '#0f172a' }}>Student Directory</h2>
+                <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
+                  Total: {filteredStudents.length} {filteredStudents.length === 1 ? 'Student' : 'Students'}
+                </span>
               </div>
+
+              {/* Search Bar */}
+              <div style={{ padding: '0.75rem 1.5rem', backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <div style={{ position: 'relative', flex: '1 1 300px' }}>
+                  <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '0.9rem' }}>🔍</span>
+                  <input
+                    type="text"
+                    placeholder="Search by Student Name, Reference Name, ID, Course, Phone, Email..."
+                    value={studentSearchQuery}
+                    onChange={(e) => setStudentSearchQuery(e.target.value)}
+                    style={{ width: '100%', padding: '0.55rem 1rem 0.55rem 2.25rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                  />
+                </div>
+                {studentSearchQuery && (
+                  <button
+                    onClick={() => setStudentSearchQuery('')}
+                    style={{ padding: '0.4rem 0.75rem', background: '#e2e8f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
               <div style={{ padding: '0' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                   <thead style={{ backgroundColor: '#f1f5f9' }}>
                     <tr>
-                      <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 600, color: '#475569', borderBottom: '1px solid #e2e8f0' }}>Student details</th>
+                      <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 600, color: '#475569', borderBottom: '1px solid #e2e8f0' }}>Student Details</th>
+                      <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 600, color: '#475569', borderBottom: '1px solid #e2e8f0' }}>Reference Name</th>
                       <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 600, color: '#475569', borderBottom: '1px solid #e2e8f0' }}>Education</th>
                       <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 600, color: '#475569', borderBottom: '1px solid #e2e8f0' }}>Docs Uploaded</th>
                       <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 600, color: '#475569', borderBottom: '1px solid #e2e8f0' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {dashboardData?.students?.map((student: any) => (
-                      <tr key={student.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                        <td style={{ padding: '1rem 1.5rem' }}>
-                          <div style={{ fontWeight: 600, color: '#0f172a' }}>{student.name || 'Unnamed'}</div>
-                          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{student.email}</div>
-                          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{student.phone || 'No phone'}</div>
-                        </td>
-                        <td style={{ padding: '1rem 1.5rem', color: '#475569', fontSize: '0.9rem' }}>
-                          {student.profile?.currentCourse ? `${student.profile.currentCourse} at ${student.profile.schoolCollegeName || 'Unknown'}` : '-'}
-                        </td>
-                        <td style={{ padding: '1rem 1.5rem' }}>
-                          <span style={{ fontSize: '0.8rem', padding: '0.2rem 0.6rem', background: '#eef2ff', color: '#4f46e5', borderRadius: '4px', fontWeight: 600 }}>
-                            {student.documents?.length || 0} files
-                          </span>
-                        </td>
-                        <td style={{ padding: '1rem 1.5rem' }}>
-                          <button onClick={() => downloadStudentPDF(student)} style={{ padding: '0.5rem 1rem', background: '#f8fafc', border: '1px solid #cbd5e1', color: '#334155', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 500 }}>📥 Download PDF</button>
+                    {filteredStudents.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
+                          No students found matching &quot;{studentSearchQuery}&quot;
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      filteredStudents.map((student: any) => (
+                        <tr key={student.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <td style={{ padding: '1rem 1.5rem' }}>
+                            <div style={{ fontWeight: 600, color: '#0f172a' }}>{student.name || 'Unnamed'}</div>
+                            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{student.email}</div>
+                            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{student.phone || 'No phone'}</div>
+                          </td>
+                          <td style={{ padding: '1rem 1.5rem', fontSize: '0.9rem', color: '#475569' }}>
+                            <div style={{ fontWeight: 600, color: '#0f172a' }}>{student.profile?.referenceName || '-'}</div>
+                            {student.profile?.referenceOrg && (
+                              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{student.profile.referenceOrg}</div>
+                            )}
+                          </td>
+                          <td style={{ padding: '1rem 1.5rem', color: '#475569', fontSize: '0.9rem' }}>
+                            {student.profile?.currentCourse ? `${student.profile.currentCourse} at ${student.profile.schoolCollegeName || 'Unknown'}` : '-'}
+                          </td>
+                          <td style={{ padding: '1rem 1.5rem' }}>
+                            <span style={{ fontSize: '0.8rem', padding: '0.2rem 0.6rem', background: '#eef2ff', color: '#4f46e5', borderRadius: '4px', fontWeight: 600 }}>
+                              {student.documents?.length || 0} files
+                            </span>
+                          </td>
+                          <td style={{ padding: '1rem 1.5rem' }}>
+                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <button 
+                                onClick={() => setSelectedStudent(student)}
+                                style={{ padding: '0.5rem 0.8rem', background: '#4f46e5', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+                              >
+                                View Details
+                              </button>
+                              <button 
+                                onClick={() => downloadStudentPDF(student)} 
+                                style={{ padding: '0.5rem 0.8rem', background: '#f8fafc', border: '1px solid #cbd5e1', color: '#334155', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 500 }}
+                              >
+                                📥 PDF
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>

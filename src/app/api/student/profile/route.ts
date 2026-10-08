@@ -36,7 +36,13 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({ profile, user, siblings });
+    return NextResponse.json({ profile, user, siblings }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -63,6 +69,14 @@ export async function POST(request: Request) {
         },
       });
     }
+
+    // Check existing profile to preserve declaration status once submitted
+    const existingProfile = await prisma.studentProfile.findUnique({
+      where: { userId: session.userId },
+      select: { isDeclared: true }
+    });
+
+    const finalIsDeclared = data.isDeclared === true ? true : (existingProfile?.isDeclared ?? false);
 
     const profile = await prisma.studentProfile.upsert({
       where: { userId: session.userId },
@@ -106,10 +120,10 @@ export async function POST(request: Request) {
         term2BalanceAmount: data.term2BalanceAmount !== undefined && data.term2BalanceAmount !== '' ? parseFloat(data.term2BalanceAmount) : undefined,
         fatherName: data.fatherName,
         fatherOccupation: data.fatherOccupation,
-        fatherIncome: data.fatherIncome ? parseFloat(data.fatherIncome) : undefined,
+        fatherIncome: data.fatherIncome !== undefined && data.fatherIncome !== '' ? parseFloat(data.fatherIncome) : undefined,
         motherName: data.motherName,
         motherOccupation: data.motherOccupation,
-        motherIncome: data.motherIncome ? parseFloat(data.motherIncome) : undefined,
+        motherIncome: data.motherIncome !== undefined && data.motherIncome !== '' ? parseFloat(data.motherIncome) : undefined,
         familyType: data.familyType,
         houseType: data.houseType,
         religion: data.religion,
@@ -119,7 +133,7 @@ export async function POST(request: Request) {
         singleParent: data.singleParent,
         orphanStatus: data.orphanStatus,
         existingLoan: data.existingLoan,
-        loanAmount: data.loanAmount ? parseFloat(data.loanAmount) : undefined,
+        loanAmount: data.loanAmount !== undefined && data.loanAmount !== '' ? parseFloat(data.loanAmount) : undefined,
         firstGraduate: data.firstGraduate,
         appliedThrough: data.appliedThrough,
         sourceType: data.sourceType,
@@ -128,7 +142,7 @@ export async function POST(request: Request) {
         referenceContact: data.referenceContact,
         referenceOrg: data.referenceOrg,
         referenceRelation: data.referenceRelation,
-        isDeclared: data.isDeclared,
+        isDeclared: finalIsDeclared,
       },
       create: {
         userId: session.userId,
@@ -171,10 +185,10 @@ export async function POST(request: Request) {
         term2BalanceAmount: data.term2BalanceAmount !== undefined && data.term2BalanceAmount !== '' ? parseFloat(data.term2BalanceAmount) : undefined,
         fatherName: data.fatherName,
         fatherOccupation: data.fatherOccupation,
-        fatherIncome: data.fatherIncome ? parseFloat(data.fatherIncome) : undefined,
+        fatherIncome: data.fatherIncome !== undefined && data.fatherIncome !== '' ? parseFloat(data.fatherIncome) : undefined,
         motherName: data.motherName,
         motherOccupation: data.motherOccupation,
-        motherIncome: data.motherIncome ? parseFloat(data.motherIncome) : undefined,
+        motherIncome: data.motherIncome !== undefined && data.motherIncome !== '' ? parseFloat(data.motherIncome) : undefined,
         familyType: data.familyType,
         houseType: data.houseType,
         religion: data.religion,
@@ -184,7 +198,7 @@ export async function POST(request: Request) {
         singleParent: data.singleParent,
         orphanStatus: data.orphanStatus,
         existingLoan: data.existingLoan,
-        loanAmount: data.loanAmount ? parseFloat(data.loanAmount) : undefined,
+        loanAmount: data.loanAmount !== undefined && data.loanAmount !== '' ? parseFloat(data.loanAmount) : undefined,
         firstGraduate: data.firstGraduate,
         appliedThrough: data.appliedThrough,
         sourceType: data.sourceType,
@@ -193,11 +207,17 @@ export async function POST(request: Request) {
         referenceContact: data.referenceContact,
         referenceOrg: data.referenceOrg,
         referenceRelation: data.referenceRelation,
-        isDeclared: data.isDeclared || false,
+        isDeclared: Boolean(data.isDeclared),
       },
     });
 
-    return NextResponse.json({ success: true, profile });
+    return NextResponse.json({ success: true, profile }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
   } catch (error) {
     console.error('Profile update error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
