@@ -6,7 +6,10 @@ import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
   try {
-    const { email, phone, password, role = 'USER' } = await request.json();
+    let { email, phone, password, role = 'USER' } = await request.json();
+
+    if (email && typeof email === 'string') email = email.trim().toLowerCase();
+    if (phone && typeof phone === 'string') phone = phone.replace(/\s+/g, '').trim();
 
     if (!email && !phone) {
       return NextResponse.json({ error: 'Email or phone required' }, { status: 400 });

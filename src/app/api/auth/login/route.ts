@@ -7,10 +7,12 @@ import { cookies } from 'next/headers';
 export async function POST(request: Request) {
   try {
     const { emailOrPhone, password, expectedRole } = await request.json();
+    const rawIdentifier = typeof emailOrPhone === 'string' ? emailOrPhone.trim() : '';
+    const digitsOnly = rawIdentifier.replace(/\s+/g, '');
 
     // Auto-seed admin if no admin exists
     const adminCount = await prisma.user.count({ where: { role: 'ADMIN' } });
-    if (adminCount === 0 && emailOrPhone === 'admin@trust.com' && password === 'admin123') {
+    if (adminCount === 0 && rawIdentifier === 'admin@trust.com' && password === 'admin123') {
       await prisma.user.create({
         data: {
           email: 'admin@trust.com',
@@ -22,7 +24,7 @@ export async function POST(request: Request) {
 
     // Auto-seed superadmin if no superadmin exists
     const superadminCount = await prisma.user.count({ where: { role: 'SUPERADMIN' } });
-    if (superadminCount === 0 && emailOrPhone === 'superadmin@trust.com' && password === 'superadmin123') {
+    if (superadminCount === 0 && rawIdentifier === 'superadmin@trust.com' && password === 'superadmin123') {
       await prisma.user.create({
         data: {
           email: 'superadmin@trust.com',
@@ -36,9 +38,10 @@ export async function POST(request: Request) {
     const user = await prisma.user.findFirst({
       where: {
         OR: [
-          { email: emailOrPhone },
-          { phone: emailOrPhone },
-          { studentId: emailOrPhone }
+          { email: rawIdentifier },
+          { phone: rawIdentifier },
+          ...(digitsOnly ? [{ phone: digitsOnly }] : []),
+          { studentId: rawIdentifier }
         ]
       }
     });
