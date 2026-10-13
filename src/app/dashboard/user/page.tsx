@@ -1026,7 +1026,7 @@ export default function UserDashboard() {
                   <input style={inputStyle} name="referenceRelation" value={formData.referenceRelation} onChange={handleChange} placeholder="e.g. Relative, Teacher, Family Friend" />
                 </div>
                 <div>
-                  <label style={labelStyle}>Nature of Association with MIPL</label>
+                  <label style={labelStyle}>Association with MIPL</label>
                   <input style={inputStyle} name="referenceMiplRelation" value={formData.referenceMiplRelation} onChange={handleChange} placeholder="e.g. Employee, Associate, Vendor, Client, Referred by Staff" />
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>

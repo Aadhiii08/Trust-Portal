@@ -370,7 +370,7 @@ export default function AdminDashboard() {
               <div class="item full-width"><span class="label">Full Name:</span> <span class="value">${student.name || 'N/A'}</span></div>
               <div class="item"><span class="label">Reference Name:</span> <span class="value" style="font-weight: 600; color: #0f172a;">${p.referenceName || 'N/A'}</span></div>
               <div class="item"><span class="label">Ref. Mobile:</span> <span class="value">${p.referenceContact || 'N/A'}</span></div>
-              <div class="item"><span class="label">MIPL Association:</span> <span class="value">${p.referenceMiplRelation || 'N/A'}</span></div>
+              <div class="item"><span class="label">Association with MIPL:</span> <span class="value">${p.referenceMiplRelation || 'N/A'}</span></div>
               <div class="item"><span class="label">Ref. Address:</span> <span class="value">${p.referenceAddress || 'N/A'}</span></div>
               <div class="item"><span class="label">Gender:</span> <span class="value">${p.gender || 'N/A'}</span></div>
               <div class="item"><span class="label">Date of Birth:</span> <span class="value">${p.dob ? new Date(p.dob).toLocaleDateString() : 'N/A'}</span></div>
