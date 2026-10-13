@@ -352,7 +352,7 @@ export default function SuperAdminDashboard() {
               <div class="item full-width"><span class="label">Full Name:</span> <span class="value">${student.name || 'N/A'}</span></div>
               <div class="item"><span class="label">Reference Name:</span> <span class="value" style="font-weight: 600; color: #0f172a;">${p.referenceName || 'N/A'}</span></div>
               <div class="item"><span class="label">Ref. Mobile:</span> <span class="value">${p.referenceContact || 'N/A'}</span></div>
-              <div class="item"><span class="label">Relation to MIPL:</span> <span class="value">${p.referenceMiplRelation || 'N/A'}</span></div>
+              <div class="item"><span class="label">MIPL Association:</span> <span class="value">${p.referenceMiplRelation || 'N/A'}</span></div>
               <div class="item"><span class="label">Ref. Address:</span> <span class="value">${p.referenceAddress || 'N/A'}</span></div>
               <div class="item"><span class="label">Gender:</span> <span class="value">${p.gender || 'N/A'}</span></div>
               <div class="item"><span class="label">Date of Birth:</span> <span class="value">${p.dob ? new Date(p.dob).toLocaleDateString() : 'N/A'}</span></div>
@@ -431,7 +431,7 @@ export default function SuperAdminDashboard() {
               <div class="item"><span class="label">Contact No:</span> <span class="value">${p.referenceContact || 'N/A'}</span></div>
               <div class="item"><span class="label">Organization:</span> <span class="value">${p.referenceOrg || 'N/A'}</span></div>
               <div class="item"><span class="label">Relationship:</span> <span class="value">${p.referenceRelation || 'N/A'}</span></div>
-              <div class="item"><span class="label">Relation to MIPL:</span> <span class="value">${p.referenceMiplRelation || 'N/A'}</span></div>
+              <div class="item"><span class="label">Association with MIPL:</span> <span class="value">${p.referenceMiplRelation || 'N/A'}</span></div>
               <div class="item full-width"><span class="label">Ref. Address:</span> <span class="value">${p.referenceAddress || 'N/A'}</span></div>
               <div class="item full-width"><span class="label">Applied Through:</span> <span class="value">${p.appliedThrough || p.sourceType || 'N/A'}</span></div>
             </div>
@@ -821,7 +821,7 @@ export default function SuperAdminDashboard() {
                       <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Contact Number:</strong> {selectedStudent.profile?.referenceContact || 'N/A'}</p>
                       <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Organization:</strong> {selectedStudent.profile?.referenceOrg || 'N/A'}</p>
                       <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Relationship with Student:</strong> {selectedStudent.profile?.referenceRelation || 'N/A'}</p>
-                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Relation with MIPL:</strong> {selectedStudent.profile?.referenceMiplRelation || 'N/A'}</p>
+                      <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Association with MIPL:</strong> {selectedStudent.profile?.referenceMiplRelation || 'N/A'}</p>
                       <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Reference Address:</strong> {selectedStudent.profile?.referenceAddress || 'N/A'}</p>
                       <p style={{ fontSize: '0.9rem', margin: '0.5rem 0' }}><strong>Applied Through:</strong> {selectedStudent.profile?.appliedThrough || selectedStudent.profile?.sourceType || 'N/A'}</p>
                     </div>
