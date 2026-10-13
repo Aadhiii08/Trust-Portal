@@ -100,13 +100,15 @@ model StudentProfile {
   firstGraduate String? // Yes, No
 
   // Reference Details
-  appliedThrough       String? // Direct, Reference
-  sourceType           String? // Employee, Trust, School/College, NGO, Existing Beneficiary
-  referenceName        String?
-  referenceDesignation String?
-  referenceContact     String?
-  referenceOrg         String?
-  referenceRelation    String?
+  appliedThrough        String? // Direct, Reference
+  sourceType            String? // Employee, Trust, School/College, NGO, Existing Beneficiary
+  referenceName         String?
+  referenceDesignation  String?
+  referenceContact      String?
+  referenceOrg          String?
+  referenceRelation     String?
+  referenceMiplRelation String?
+  referenceAddress      String?
 
   isDeclared Boolean @default(false)
 

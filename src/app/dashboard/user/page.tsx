@@ -32,6 +32,7 @@ export default function UserDashboard() {
     medicalIssue: '', singleParent: '', orphanStatus: '', existingLoan: '', loanAmount: 0, firstGraduate: '',
     appliedThrough: '', sourceType: '',
     referenceName: '', referenceDesignation: '', referenceContact: '', referenceOrg: '', referenceRelation: '',
+    referenceMiplRelation: '', referenceAddress: '',
     isDeclared: false, institutionType: 'COLLEGE'
   });
 
@@ -1022,7 +1023,22 @@ export default function UserDashboard() {
                 </div>
                 <div>
                   <label style={labelStyle}>Relationship with Student</label>
-                  <input style={inputStyle} name="referenceRelation" value={formData.referenceRelation} onChange={handleChange} />
+                  <input style={inputStyle} name="referenceRelation" value={formData.referenceRelation} onChange={handleChange} placeholder="e.g. Relative, Teacher, Family Friend" />
+                </div>
+                <div>
+                  <label style={labelStyle}>How is the Reference known to MIPL? / Relation with MIPL</label>
+                  <input style={inputStyle} name="referenceMiplRelation" value={formData.referenceMiplRelation} onChange={handleChange} placeholder="e.g. Employee, Client, Associate, Vendor, Friend of staff" />
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label style={labelStyle}>Reference Person Address</label>
+                  <textarea 
+                    rows={2} 
+                    style={{ ...inputStyle, resize: 'vertical' }} 
+                    name="referenceAddress" 
+                    value={formData.referenceAddress} 
+                    onChange={handleChange} 
+                    placeholder="Enter residential or office address of reference person" 
+                  />
                 </div>
               </div>
             </div>

@@ -142,6 +142,8 @@ export async function POST(request: Request) {
         referenceContact: data.referenceContact,
         referenceOrg: data.referenceOrg,
         referenceRelation: data.referenceRelation,
+        referenceMiplRelation: data.referenceMiplRelation,
+        referenceAddress: data.referenceAddress,
         isDeclared: finalIsDeclared,
       },
       create: {
@@ -207,6 +209,8 @@ export async function POST(request: Request) {
         referenceContact: data.referenceContact,
         referenceOrg: data.referenceOrg,
         referenceRelation: data.referenceRelation,
+        referenceMiplRelation: data.referenceMiplRelation,
+        referenceAddress: data.referenceAddress,
         isDeclared: Boolean(data.isDeclared),
       },
     });
